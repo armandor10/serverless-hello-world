@@ -3,6 +3,18 @@ service: sls-apigateway-basic
 provider:
   name: aws
   runtime: nodejs10.x
+  environment:
+    DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
 
 functions:
   hello:
@@ -11,3 +23,28 @@ functions:
       - http: 
           method: get
           path: hello
+  saveItem:
+    handler: handler.save
+    events:
+      - http:
+          path: hello
+          method: post
+
+resources:
+  Resources:
+    greetNamesTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: itemId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: itemId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
